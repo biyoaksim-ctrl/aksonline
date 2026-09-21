@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Aks Online Meet Sayacı",
+  "version": "1.0.0",
+  "description": "Meet odasındaki kişi sayısını Aks Online paneline iletir. Karşıdan biri girince sayaç başlar.",
+  "host_permissions": [
+    "https://meet.google.com/*",
+    "http://127.0.0.1:8787/*",
+    "http://localhost:8787/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://meet.google.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

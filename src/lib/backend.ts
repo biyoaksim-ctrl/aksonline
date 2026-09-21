@@ -1,0 +1,196 @@
+/**
+ * Sunucu bağlantı istemcisi.
+ *
+ * Sunucu ayaktaysa canlı katılımcı sayısı WebSocket ile gelir.
+ * Sunucu yoksa (yalnızca statik arayüz yayında) bağlantı kurulamaz ve
+ * arayüz manuel kipe düşer; hiçbir şey bozulmaz.
+ */
+
+export type ServerAttendance = {
+  roomId: string;
+  code: string;
+  count: number;
+  status: "waiting" | "live" | "error" | "idle";
+  lastSyncAt: number | null;
+  error: string | null;
+};
+
+type Listener = (attendance: ServerAttendance) => void;
+
+interface ServerStatus {
+  connected: boolean;
+  hasToken: boolean;
+}
+
+const RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 15000];
+
+class BackendClient {
+  private socket: WebSocket | null = null;
+  private retries = 0;
+  private reconnectTimer: number | null = null;
+  private listeners = new Map<string, Set<Listener>>();
+  private watched = new Set<string>();
+  private statusListeners = new Set<(status: ServerStatus) => void>();
+
+  connected = false;
+  hasToken = false;
+
+  /** Production'da aynı origin; Vite dev'de Node sunucusu :8787. */
+  private resolveUrl(): string {
+    if (typeof window === "undefined") return "";
+    const devServer = window.location.port === "5173" || window.location.port === "4173";
+    const host = devServer ? `${window.location.hostname}:8787` : window.location.host;
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    return `${protocol}//${host}/ws`;
+  }
+
+  connect(): void {
+    if (typeof window === "undefined") return;
+    if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) return;
+
+    let socket: WebSocket;
+    try {
+      socket = new WebSocket(this.resolveUrl());
+    } catch {
+      this.scheduleReconnect();
+      return;
+    }
+
+    this.socket = socket;
+
+    socket.onopen = () => {
+      this.connected = true;
+      this.retries = 0;
+      this.emitStatus();
+      // Yeniden bağlandığında tüm abonelikleri yenile.
+      this.watched.forEach((roomId) => {
+        const code = this.codes.get(roomId);
+        if (code) this.send({ type: "watch", roomId, code });
+      });
+    };
+
+    socket.onmessage = (event) => {
+      try {
+        const message = JSON.parse(String(event.data));
+        if (message?.type === "config") {
+          this.hasToken = Boolean(message.hasToken);
+          this.emitStatus();
+          return;
+        }
+        if (message?.type === "attendance" && typeof message.roomId === "string") {
+          const listeners = this.listeners.get(message.roomId);
+          if (!listeners?.size) return;
+          const payload: ServerAttendance = {
+            roomId: message.roomId,
+            code: String(message.code ?? ""),
+            count: Number(message.count) || 0,
+            status: message.status ?? "idle",
+            lastSyncAt: typeof message.lastSyncAt === "number" ? message.lastSyncAt : null,
+            error: message.error ?? null,
+          };
+          listeners.forEach((listener) => listener(payload));
+        }
+      } catch {
+        // Bozuk paket yoksayılır.
+      }
+    };
+
+    const drop = () => {
+      if (this.socket !== socket) return;
+      this.socket = null;
+      this.connected = false;
+      this.emitStatus();
+      this.scheduleReconnect();
+    };
+
+    socket.onclose = drop;
+    socket.onerror = () => socket.close();
+  }
+
+  private codes = new Map<string, string>();
+
+  private scheduleReconnect(): void {
+    if (this.reconnectTimer !== null) return;
+    const delay = RECONNECT_DELAYS[Math.min(this.retries, RECONNECT_DELAYS.length - 1)];
+    this.retries += 1;
+    this.reconnectTimer = window.setTimeout(() => {
+      this.reconnectTimer = null;
+      this.connect();
+    }, delay);
+  }
+
+  private send(payload: unknown): void {
+    if (this.socket?.readyState === WebSocket.OPEN) this.socket.send(JSON.stringify(payload));
+  }
+
+  private emitStatus(): void {
+    const status = { connected: this.connected, hasToken: this.hasToken };
+    this.statusListeners.forEach((listener) => listener(status));
+  }
+
+  /** Bir odayı takip etmeye başlar. */
+  watch(roomId: string, code: string, listener: Listener): () => void {
+    this.codes.set(roomId, code.toLowerCase());
+    const set = this.listeners.get(roomId) ?? new Set<Listener>();
+    set.add(listener);
+    this.listeners.set(roomId, set);
+
+    if (!this.watched.has(roomId)) {
+      this.watched.add(roomId);
+      this.send({ type: "watch", roomId, code: code.toLowerCase() });
+    }
+    this.connect();
+
+    return () => {
+      set.delete(listener);
+      if (!set.size) {
+        this.listeners.delete(roomId);
+        this.watched.delete(roomId);
+        this.codes.delete(roomId);
+        this.send({ type: "unwatch", roomId });
+      }
+    };
+  }
+
+  onStatus(listener: (status: ServerStatus) => void): () => void {
+    this.statusListeners.add(listener);
+    listener({ connected: this.connected, hasToken: this.hasToken });
+    return () => this.statusListeners.delete(listener);
+  }
+
+  /** Erişim token'ını gövdeyle iletir; URL'ye ve hafızaya yazılmaz. */
+  async saveToken(token: string): Promise<boolean> {
+    try {
+      const apiHost = typeof window !== "undefined" && (window.location.port === "5173" || window.location.port === "4173")
+        ? `${window.location.protocol}//${window.location.hostname}:8787`
+        : "";
+      const response = await fetch(`${apiHost}/api/config`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      if (!response.ok) return false;
+      this.hasToken = Boolean(token.trim());
+      this.emitStatus();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async clearToken(): Promise<void> {
+    await this.saveToken("");
+  }
+}
+
+export const backend = new BackendClient();
+
+/** Kod değerinden Meet odası kodu çıkarır. */
+export function codeFromUrl(url: string): string {
+  try {
+    const path = new URL(url).pathname.replace(/^\/|\/$/g, "");
+    return /^[a-z]{3}-[a-z]{4}-[a-z]{3}$/i.test(path) ? path.toLowerCase() : "";
+  } catch {
+    return "";
+  }
+}
