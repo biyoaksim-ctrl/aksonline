@@ -133,7 +133,6 @@ export default function App() {
   const [waToken, setWaToken] = useState("");
   const [tab, setTab] = useState<"panels" | "reports" | "settings">("panels");
   const [reports, setReports] = useState<ReportEntry[]>(loadReports);
-  const notified = useRef<Set<string>>(new Set());
   const [stageWidth, setStageWidth] = useState(typeof window === "undefined" ? 1200 : window.innerWidth);
   const nameRef = useRef<HTMLInputElement>(null);
   const stageRef = useRef<HTMLElement>(null);
@@ -143,7 +142,6 @@ export default function App() {
   const [server, setServer] = useState({ connected: false, hasToken: false });
   const [attendance, setAttendance] = useState<Record<string, { count: number; status: string; live: boolean }>>({});
   const [tokenDraft, setTokenDraft] = useState("");
-
   useEffect(() => backend.connect(), []);
 
   useEffect(() => backend.onStatus((status) => setServer(status)), []);
@@ -301,29 +299,6 @@ export default function App() {
     });
   };
 
-  const notifyJoin = (cell: MeetCell, person: string) => {
-    const key = `${cell.id}:${person.toLocaleLowerCase("tr-TR")}`;
-    if (notified.current.has(key)) return;
-    notified.current.add(key);
-    pushReport({ kind: "join", roomId: cell.id, roomName: cell.name, person, detail: "Odaya katıldı — sayaç başladı" });
-    if (!settings.waEnabled) return;
-    const cfg: WhatsAppConfig = {
-      enabled: true,
-      phoneNumberId: settings.waPhoneId,
-      accessToken: waToken,
-      to: settings.waTo,
-      template: settings.waTemplate,
-    };
-    const text = fillTemplate(settings.waTemplate || DEFAULTS.waTemplate, {
-      name: person,
-      room: cell.name,
-      time: new Date().toLocaleString("tr-TR"),
-    });
-    void sendWhatsAppText(cfg, text).then((result) => {
-      pushReport({ kind: "whatsapp", roomId: cell.id, roomName: cell.name, person, detail: result.detail, ok: result.ok });
-    });
-  };
-
   const openLane = (cell: MeetCell) => {
     if (laneIds.includes(cell.id)) return;
     if (laneIds.length >= MAX_FRAMES) {
@@ -340,7 +315,6 @@ export default function App() {
     hub.stop(cell);
     setLaneIds((previous) => previous.filter((id) => id !== cell.id));
     pushReport({ kind: "room-close", roomId: cell.id, roomName: cell.name, detail: "Çerçeve kapatıldı" });
-    notified.current.forEach((key) => { if (key.startsWith(`${cell.id}:`)) notified.current.delete(key); });
   };
 
   const openAll = () => {
@@ -630,12 +604,6 @@ export default function App() {
                 onUpdate={(patch) => hub.update(cell.id, patch)}
                 onRestart={() => hub.restart(cell)}
                 onCloseLane={() => closeLane(cell)}
-                onJoin={(participantName) => { hub.recordJoin(cell.id, participantName); notifyJoin(cell, participantName); }}
-                onLeave={(participantId) => {
-                  const person = cell.attendance.find((item) => item.id === participantId);
-                  hub.recordLeave(cell.id, participantId);
-                  pushReport({ kind: "leave", roomId: cell.id, roomName: cell.name, person: person?.name, detail: "Odadan çıkış" });
-                }}
               />
             ))}
           </div>

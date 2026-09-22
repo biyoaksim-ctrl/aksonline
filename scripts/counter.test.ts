@@ -1,6 +1,5 @@
 import { strict as assert } from "node:assert";
 import { advanceCounter, counterMs, emptyCounter, resolveLivePresent } from "../src/lib/counter.ts";
-import { intervalDuration, isPresent, joinManual, leaveManual } from "../src/lib/attendance.ts";
 
 const T0 = 1_700_000_000_000;
 let checks = 0;
@@ -39,28 +38,14 @@ console.log("\n1) Sayaç: girince başlar, çıkınca durur, gelince devam eder"
   ok("tekrar girince kaldığı yerden devam eder");
 }
 
-console.log("\n2) Sayı kaynağı: sunucu varsa sunucu, yoksa elle eklenen katılımcı");
+console.log("\n2) Sayı kaynağı: yalnızca sunucudan gelen canlı sayı");
 {
-  assert.equal(resolveLivePresent(true, 3, 5), 3, "canlı sayı geldiğinde sunucu geçerli");
-  assert.equal(resolveLivePresent(false, 3, 5), 5, "sunucu yokken manuel katılımcılar sayılır");
-  assert.equal(resolveLivePresent(false, 0, 0), 0, "kimse yoksa sayaç kapalı");
-  assert.equal(resolveLivePresent(true, -4, 0), 0, "bozuk sayı 0'a düşer");
-  ok("kaynak önceliği doğru");
-}
-
-console.log("\n3) Manuel katılım kaydı: giriş/çıkış");
-{
-  let people = joinManual([], "Ayşe", T0);
-  assert.equal(isPresent(people[0]), true, "giren katılımcı içeride");
-  people = leaveManual(people, people[0].id, T0 + 30_000);
-  assert.equal(isPresent(people[0]), false, "çıkan katılımcı dışarıda");
-  assert.equal(intervalDuration(people[0].sessions, T0 + 30_000), 30_000, "oturum süresi doğru");
-  people = joinManual(people, "ayşe", T0 + 60_000);
-  assert.equal(people.length, 1, "aynı isim mükerrer kişi açmaz");
-  assert.equal(people[0].sessions.length, 2, "ikinci gelişte yeni oturum açılır");
-  assert.equal(isPresent(people[0]), true, "tekrar gelen yeniden içeride sayılır");
-  assert.equal(intervalDuration(people[0].sessions, T0 + 90_000), 60_000, "iki oturum toplanır, üste yazmaz");
-  ok("aynı kişi tekrar girince yeni oturum açılır");
+  assert.equal(resolveLivePresent(true, 3), 3, "canlı sayı geldiğinde sayaç onu izler");
+  assert.equal(resolveLivePresent(false, 3), 0, "sunucu yokken sayı yoktur, sayaç başlamaz");
+  assert.equal(resolveLivePresent(false, 0), 0, "kimse yoksa sayaç kapalı");
+  assert.equal(resolveLivePresent(true, -4), 0, "bozuk sayı 0'a düşer");
+  assert.equal(resolveLivePresent(true, 2.7), 2, "kesirli sayı alta yuvarlanır");
+  ok("sayaç yalnızca karşıdan katılan gerçek kişi sayısına göre çalışır");
 }
 
 console.log(`\nSonuç: ${checks} kontrol geçti.`);

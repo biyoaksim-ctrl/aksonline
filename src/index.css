@@ -314,14 +314,10 @@ svg { flex: none; }
 .compact-placeholder > div:last-child { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
 .btn-meet { min-height: 28px; padding: 4px 10px; border-color: color-mix(in srgb, var(--accent) 40%, transparent); color: white; background: color-mix(in srgb, var(--accent) 70%, black); }
 .frame-overlay-tools { position: absolute; left: 7px; bottom: 7px; z-index: 4; display: flex; flex-wrap: wrap; gap: 5px; max-width: calc(100% - 92px); }
-.guest-chip { display: flex; align-items: center; height: 30px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); border-radius: 8px; background: color-mix(in srgb, var(--bg-2) 92%, transparent); backdrop-filter: blur(8px); box-shadow: 0 4px 14px var(--shadow); }
 .frame-blocked-notice { position: absolute; left: 7px; right: 7px; top: 7px; z-index: 5; display: flex; align-items: flex-start; gap: 7px; padding: 8px 10px; border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent); border-radius: 8px; background: color-mix(in srgb, var(--danger) 12%, var(--bg-2)); color: var(--text); backdrop-filter: blur(8px); }
 .frame-blocked-notice svg { width: 14px; height: 14px; color: var(--danger); margin-top: 1px; }
 .frame-blocked-notice strong { display: block; font-size: 10px; font-weight: 600; margin-bottom: 2px; }
 .frame-blocked-notice span { font-size: 9px; line-height: 1.5; opacity: .8; }
-.guest-chip input { width: min(120px, 28cqw); min-width: 72px; height: 100%; border: 0; outline: 0; padding: 0 8px; color: var(--text); background: transparent; font-size: 10px; }
-.guest-chip button { display: grid; place-items: center; width: 28px; height: 100%; border: 0; border-left: 1px solid var(--line); color: var(--accent); background: transparent; }
-.guest-chip button svg { width: 12px; height: 12px; }
 .guest-pill { height: 28px; padding: 0 8px; border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); border-radius: 999px; color: var(--accent); background: color-mix(in srgb, var(--bg-2) 88%, transparent); font-size: 9px; white-space: nowrap; backdrop-filter: blur(8px); }
 .guest-pill:hover { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, transparent); }
 .zoom-flyout { position: absolute; right: 7px; bottom: 7px; z-index: 5; display: flex; align-items: flex-end; gap: 5px; }

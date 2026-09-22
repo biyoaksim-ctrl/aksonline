@@ -27,11 +27,11 @@ export function advanceCounter(state: CounterState, running: boolean, now: numbe
   return { accum: state.accum + Math.max(0, now - state.startAt), startAt: null };
 }
 
-/** Oda içindeki kişi sayısı: sunucu canlı veriyorsa o, değilse elle eklenen katılımcılar. */
-export function resolveLivePresent(serverLive: boolean, serverCount: number, manualPresent: number): number {
-  if (!Number.isFinite(serverCount) || serverCount < 0) serverCount = 0;
-  if (!Number.isFinite(manualPresent) || manualPresent < 0) manualPresent = 0;
-  return serverLive ? serverCount : manualPresent;
+/** İçeride kaç kişi olduğu: sayaç yalnızca sunucudan gelen canlı sayıya göre çalışır. */
+export function resolveLivePresent(serverLive: boolean, serverCount: number): number {
+  if (!serverLive) return 0;
+  if (!Number.isFinite(serverCount) || serverCount < 0) return 0;
+  return Math.floor(serverCount);
 }
 
 /** O anki toplam gösterilen süre (biriken + henüz durdurulmamış segment). */

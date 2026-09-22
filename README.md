@@ -50,9 +50,10 @@ Her `main`'e push `.github/workflows/deploy.yml` ile otomatik yayınlanır:
 
 **https://biyoaksim-ctrl.github.io/aksonline/**
 
-Bu yayında Node sunucusu yoktur. Arayüz çalışır, paneller/zoom/tema/raporlar çalışır,
-katılımcı **elle** eklenir ve sayaç aynı kuralla çalışır (ilk kişi girince başlar,
-son kişi çıkınca durur). Sol panelin altında "Sunucu yok · manuel takip" yazar.
+Bu yayında Node sunucusu yoktur: arayüz, paneller, zoom, tema ve raporlar çalışır,
+ama **canlı katılımcı sayısı gelmez** — bu yüzden sayaç burada çalışmaz.
+Sayaç için Render yayını (`https://aks-online.onrender.com`) kullanın.
+Sol panelin altında "Sunucu yok · Meet eklentisi gerekli" yazar.
 
 ### 2) Render.com — canlı katılımcı sayısı ile
 
@@ -105,12 +106,12 @@ Token arayüzden de girilebilir: **Ayarlar → Sunucu ve canlı katılımcı alg
 
 ## Sayaç kuralı
 
-- Odada **1 veya daha fazla kişi** olduğunda sayaç başar (canlı sayı `1` olduğunda).
-- Sayı 0 olunca sayaç durur; biriken süre saklanır ve kaybolmaz.
-- Katılımcı tekrar girdiğinde sayaç kaldığı yerden devam eder.
+- Karşıdan katılımcı geldiğinde, yani canlı sayı `1` olduğunda sayaç **başlar**.
+- Sayı `0` olunca sayaç **durur**; biriken süre saklanır ve kaybolmaz.
+- Katılımcı tekrar girdiğinde sayaç kaldığı yerden **devam eder**.
 - Sayaç zaman damgasına dayanır; sekme arka plana alınsa da kaymaz.
-- Sunucu yokken paneldekilerle **elle eklenen katılımcılar** da aynı kuralı işletir:
-  ilk kişi girince başlar, son kişi çıkınca durur.
+- Elle giriş yoktur: sayı, Meet sekmesindeki Aks eklentisi ve/veya Google Meet API
+  üzerinden sunucudan okunur.
 
 ## Google Meet API yetkisi
 
@@ -142,8 +143,8 @@ Toplantı kayıtlarına erişim yetkiniz olmalı. Kayıtlar gecikmeli oluşabili
 
 Yalnızca `dist/` statik yayınlandığında arayüz çalışmaya devam eder:
 - Paneller, zoom, tema, logo, raporlar, WhatsApp çalışır
-- Katılımcılar elle eklenir (`+` düğmesi), sayaç yine 1+ kişide başlar
-- Sol panelin altında "Sunucu yok · manuel takip" yazar
+- **Canlı sayı gelmez** (sunucu gerekir), bu yüzden sayaç çalışmaz
+- Sol panelin altında "Sunucu yok · Meet eklentisi gerekli" yazar
 
 ## Dosya düzeni
 
