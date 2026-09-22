@@ -126,7 +126,9 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: "/ws" });
 
 function send(ws, payload) {
-  if (ws.readyState === 1) ws.send(JSON.stringify(payload));
+  // payload bazen hazır JSON (broadcast), bazen obje (doğrudan yanıt).
+  // İki kez stringify edilirse mesaj "string içinde string" olur ve arayüz yutar.
+  if (ws.readyState === 1) ws.send(typeof payload === "string" ? payload : JSON.stringify(payload));
 }
 
 function broadcastConfig() {

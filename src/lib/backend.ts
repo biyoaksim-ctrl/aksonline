@@ -71,22 +71,25 @@ class BackendClient {
 
     socket.onmessage = (event) => {
       try {
-        const message = JSON.parse(String(event.data));
-        if (message?.type === "config") {
-          this.hasToken = Boolean(message.hasToken);
+        let message: unknown = JSON.parse(String(event.data));
+        // Savunma: bazı ara katmanlar paketi ikez kez sarmış olabilir.
+        if (typeof message === "string") message = JSON.parse(message);
+        const data = message as { type?: string; roomId?: string; hasToken?: boolean; count?: number; status?: string; lastSyncAt?: number; error?: string | null; code?: string };
+        if (data?.type === "config") {
+          this.hasToken = Boolean(data.hasToken);
           this.emitStatus();
           return;
         }
-        if (message?.type === "attendance" && typeof message.roomId === "string") {
-          const listeners = this.listeners.get(message.roomId);
+        if (data?.type === "attendance" && typeof data.roomId === "string") {
+          const listeners = this.listeners.get(data.roomId);
           if (!listeners?.size) return;
           const payload: ServerAttendance = {
-            roomId: message.roomId,
-            code: String(message.code ?? ""),
-            count: Number(message.count) || 0,
-            status: message.status ?? "idle",
-            lastSyncAt: typeof message.lastSyncAt === "number" ? message.lastSyncAt : null,
-            error: message.error ?? null,
+            roomId: data.roomId,
+            code: String(data.code ?? ""),
+            count: Number(data.count) || 0,
+            status: (data.status as ServerAttendance["status"]) ?? "idle",
+            lastSyncAt: typeof data.lastSyncAt === "number" ? data.lastSyncAt : null,
+            error: data.error ?? null,
           };
           listeners.forEach((listener) => listener(payload));
         }

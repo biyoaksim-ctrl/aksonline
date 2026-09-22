@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "start": "node src/server/index.js",
     "server": "node src/server/index.js",
-    "test": "tsx scripts/counter.test.ts"
+    "test": "tsx scripts/counter.test.ts && tsx scripts/ws.test.ts"
   },
   "engines": {
     "node": ">=20"
