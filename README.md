@@ -42,23 +42,37 @@ npm test     # sayaç kuralları: başlar / durur / kaldığı yerden devam eder
 `src/lib/counter.ts` içindeki saf sayaç çekirdeği hem LaneFrame bileşeninde hem de
 `scripts/counter.test.ts` içinde aynı fonksiyonları kullanır.
 
-## Web'de yayınlama (Render.com)
+## Web'de yayınlama
 
-1. Bu repoyu GitHub'a itin (`git add . && git commit && git push`)
-2. [render.com](https://render.com) → **New + Web Service** → repoyu seçin
-3. `render.yaml` okunur; **Build Command** ve **Start Command** otomatik gelir
-   (`npm ci && npm run build` / `npm start`)
-4. **Create Web Service** deyin; bittiğinde size verilen adres
-   `https://<ad>.onrender.com` biçimindedir
-5. Paneli o adreste açın; sol alttaki durum noktası yeşile döner
+### 1) GitHub Pages — anında yayında (sunucusuz)
+
+Her `main`'e push `.github/workflows/deploy.yml` ile otomatik yayınlanır:
+
+**https://biyoaksim-ctrl.github.io/aksonline/**
+
+Bu yayında Node sunucusu yoktur. Arayüz çalışır, paneller/zoom/tema/raporlar çalışır,
+katılımcı **elle** eklenir ve sayaç aynı kuralla çalışır (ilk kişi girince başlar,
+son kişi çıkınca durur). Sol panelin altında "Sunucu yok · manuel takip" yazar.
+
+### 2) Render.com — canlı katılımcı sayısı ile
+
+Canlı Meet sayısının gelmesi için Node sunucusunun da yayınlanması gerekir.
+
+1. Bu repoyu GitHub'a itin
+2. [render.com](https://render.com) → **Sign in with GitHub** → **New +** → **Blueprint** → repoyu seç → **Apply**
+   (`render.yaml` build/start/health ayarlarını otomatik getirir)
+3. Bittiğinde `https://aks-online.onrender.com` benzeri adresi alırsınız
+4. Paneli bu adreste açın; sol alttaki durum noktası yeşile döner
+5. `extension/content.js` içindeki `HOSTED_ORIGIN` sabitini bu adresle değiştirip
+   eklentiyi `chrome://extensions` → **Paketlenmemiş yüklemeyi ekle** ile yeniden yükleyin
 
 Notlar:
 
 - Render ücretsiz planında servis birkaç dakika işlem yapmazsa uykuya dalar; ilk istekte
   uyanır. `healthCheckPath: /api/health` bunu hızlandırır.
-- Sunucu `0.0.0.0:PORT` üzerinde dinler; Render'ın `PORT` değişkenini kullanır.
-- `dist/` repoda hazır durur ama Render yine de `npm run build` ile tazeler.
-- GitHub'a her push otomatik yayını tetikler (`autoDeploy: true`).
+- Sunucu `HOST` (varsayılan `0.0.0.0`) ve `PORT` üzerinde dinler.
+- `dist/` repoda hazır durur ama yayınlarda `npm run build` ile tazelenir.
+- GitHub'a her push, Render otomatik yayını (`autoDeploy: true`) ve GitHub Pages'i tetikler.
 
 ### Yayın adresini eklentiye tanıma
 
