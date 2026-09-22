@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import type { CSSProperties, FormEvent } from "react";
+import type { CSSProperties } from "react";
 import type { MeetCell } from "../types";
 import type { CellSession } from "../lib/useMeetHub";
 import { buildLaunchUrl, clampZoom, fmtDuration, MAX_ZOOM, meetCode, MIN_ZOOM } from "../lib/meet";
 import { isPresent } from "../lib/attendance";
+import { advanceCounter, counterMs, resolveLivePresent } from "../lib/counter";
 import { Ico } from "./icons";
 
 interface Props {
@@ -26,41 +27,54 @@ interface Props {
   onLeave: (id: string) => void;
 }
 
+let mediaPermissionRequested = false;
+
 /**
  * Sağ paneldeki bağımsız çerçeve.
  * Katılımcı sayısı iki kaynaktan gelir:
  *   1) Sunucu (Google Meet REST API) — gerçek, canlı, otomatik
  *   2) Manuel giriş — sunucu yokken kullanıcı kendi ekler
- * Sayaç yalnızca içeride 2+ kişi olduğunda çalışır.
+ * Sayaç içeride en az 1 kişi olduğunda çalışır.
  */
 export default function LaneFrame(p: Props) {
-  const { cell, muteAudioDefault = true, muteVideoDefault = true } = p;
+  const { cell, muteAudioDefault = false, muteVideoDefault = false } = p;
   const frameRef = useRef<HTMLElement>(null);
   const [zoomOpen, setZoomOpen] = useState(false);
-  const [guestName, setGuestName] = useState("");
-  const [frameLoaded, setFrameLoaded] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
   const code = meetCode(cell.url).replace(/\/$/, "");
   const scale = cell.zoom / 100;
   const frameSrc = buildLaunchUrl(cell, muteAudioDefault, muteVideoDefault);
 
-  // Katılımcı sayısı: sunucu CANLI veri veriyorsa o sayı, yoksa manuel kayıt.
-  // Eşik: 2 ve üstü olunca sayaç çalışır.
-  const MEETING_THRESHOLD = 2;
-  const serverCount = p.serverLive ? p.serverCount : 0;
-  const manualPresent = cell.attendance.filter((person) => isPresent(person));
-  const livePresent = p.serverLive ? serverCount : manualPresent.length;
+  // Henüz çıkmamış manuel katılımcılar: hem listede gösterilir hem sayacı sürer.
+  const manualPeople = cell.attendance.filter((person) => person.source === "manual" && isPresent(person));
+
+  // Katılımcı sayısı iki kaynaktan gelir:
+  //   1) Sunucu (Meet sekmesindeki eklenti veya Google API) → canlı sayı
+  //   2) Sunucu yokken paneldekilerin elle eklediği katılımcılar
+  // Eşik: odada en az 1 kişi varsa sayaç çalışır.
+  const MEETING_THRESHOLD = 1;
   const usingServer = p.serverLive;
-  const meetingOn = livePresent >= MEETING_THRESHOLD;
+  const serverCount = p.serverCount;
+  const manualPresent = manualPeople.length;
+  const livePresent = resolveLivePresent(usingServer, serverCount, manualPresent);
+  const participantJoined = livePresent >= MEETING_THRESHOLD;
+  const meetingOn = participantJoined;
 
   // --- BİRİKİMLİ SAYAÇ ---
-  // Karşıdan biri girer (2. kişi) → başlar.
-  // Çıkar (1 kalır) → DURUR, süre saklanır.
+  // Odaya biri girer → başlar.
+  // Oda boşalır → DURUR, süre saklanır.
   // Tekrar girer → kaldığı yerden DEVAM eder. Sayfa yenilense de saklı.
   const [guestAccum, setGuestAccum] = useState<number>(Math.max(0, Number(cell.guestAccum) || 0));
+  const [draft, setDraft] = useState("");
   const segmentStartRef = useRef<number | null>(null);
   const [segmentActive, setSegmentActive] = useState(false);
+
+  // Depodaki değer değişirse (başka sekme, geri yükleme) sayaç onu takip eder.
+  useEffect(() => {
+    if (segmentStartRef.current !== null) return;
+    setGuestAccum(Math.max(0, Number(cell.guestAccum) || 0));
+  }, [cell.guestAccum]);
 
   useEffect(() => {
     if (meetingOn) {
@@ -69,11 +83,12 @@ export default function LaneFrame(p: Props) {
         setSegmentActive(true);
       }
     } else if (segmentStartRef.current !== null) {
-      const total = guestAccum + Math.max(0, Date.now() - segmentStartRef.current);
+      // Oda boşaldı: geçen süreyi topla, segmenti kapat, birikimi depoya yaz.
+      const stopped = advanceCounter({ accum: guestAccum, startAt: segmentStartRef.current }, false, Date.now());
       segmentStartRef.current = null;
       setSegmentActive(false);
-      setGuestAccum(total);
-      p.onUpdate({ guestAccum: total });
+      setGuestAccum(stopped.accum);
+      p.onUpdate({ guestAccum: stopped.accum });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meetingOn]);
@@ -86,13 +101,13 @@ export default function LaneFrame(p: Props) {
     return () => window.clearInterval(timer);
   }, [cell.openedAt, segmentActive]);
 
-  // Meet sayfası 4 sn içinde yüklenmezse gömülme engellenmiş kabul edilir.
   useEffect(() => {
-    if (!frameSrc) return;
-    setFrameLoaded(false);
-    const timer = window.setTimeout(() => setFrameLoaded((loaded) => loaded), 4000);
-    return () => window.clearTimeout(timer);
-  }, [frameSrc, p.session.frameKey]);
+    if (!frameSrc || mediaPermissionRequested || !navigator.mediaDevices?.getUserMedia) return;
+    mediaPermissionRequested = true;
+    void navigator.mediaDevices.getUserMedia({ audio: true, video: true })
+      .then((stream) => stream.getTracks().forEach((track) => track.stop()))
+      .catch(() => { /* Tarayıcı izni reddedilirse Meet kendi uyarısını gösterir. */ });
+  }, [frameSrc]);
 
   const fullscreen = async () => {
     try {
@@ -103,28 +118,17 @@ export default function LaneFrame(p: Props) {
 
   const changeZoom = (value: number) => p.onUpdate({ zoom: clampZoom(value) });
 
-  const submitGuest = (event: FormEvent) => {
-    event.preventDefault();
-    const value = guestName.trim() || `Katılımcı ${cell.attendance.length + 1}`;
-    p.onJoin(value);
-    setGuestName("");
-    setNow(Date.now());
-  };
-
   const roomMs = cell.openedAt ? now - cell.openedAt : 0;
-  const runningMs = segmentStartRef.current ? Math.max(0, now - segmentStartRef.current) : 0;
-  const guestMs = guestAccum + runningMs;
+  const guestMs = counterMs({ accum: guestAccum, startAt: segmentStartRef.current }, now);
   const hasTime = guestMs > 0;
 
   const serverBadge = usingServer
     ? { cls: "on", label: `${livePresent}`, title: `Canlı takip · ${livePresent} kişi içeride · sayaç ${meetingOn ? "ÇALIŞIYOR" : "bekliyor"}` }
     : p.serverConnected
     ? { cls: "wait", label: "…", title: "Sunucu bağlı — Meet sekmesinden katılım bekleniyor (Aks rozetini kontrol edin)" }
+    : manualPresent > 0
+    ? { cls: "on", label: `${manualPresent}`, title: `Manuel takip · içeride ${manualPresent} kişi · elle eklenen katılımcıyla sayaç çalışıyor` }
     : { cls: "off", label: "off", title: "Sunucu bağlı değil — sunucuyu başlatın ve Meet eklentisini kurun" };
-
-  const iframeAllow = muteAudioDefault && muteVideoDefault
-    ? "camera 'none'; microphone 'none'; display-capture; autoplay; fullscreen; clipboard-write"
-    : "camera; microphone; display-capture; autoplay; fullscreen; clipboard-write";
 
   return (
     <section ref={frameRef} className={`meet-frame ${p.compactHeader ? "compact" : ""}`} style={{ "--lane-color": cell.color } as CSSProperties}>
@@ -140,8 +144,8 @@ export default function LaneFrame(p: Props) {
             <Ico.Clock className="h-3 w-3" /><time>{fmtDuration(roomMs)}</time>
           </span>
           <span className={`timer guest ${meetingOn ? "on" : hasTime ? "paused" : ""}`}
-            title={meetingOn ? `ÇALIŞIYOR — ${livePresent} kişi içeride` : hasTime ? `DURDU — süre saklı, ${livePresent}/2 · karşıdan biri girince devam eder` : `Karşıdan biri girince (2 kişi) başlar — şu an ${livePresent}`}>
-            <Ico.Users className="h-3 w-3" /><time>{hasTime || meetingOn ? fmtDuration(guestMs) : "00:00:00"}</time><em>{livePresent}/2</em>
+            title={meetingOn ? `ÇALIŞIYOR — ${livePresent} kişi içeride` : hasTime ? `DURDU — süre saklı, oda boşalınca durur` : `Odaya biri girince başlar — şu an ${livePresent}`}>
+            <Ico.Users className="h-3 w-3" /><time>{hasTime || meetingOn ? fmtDuration(guestMs) : "00:00:00"}</time><em>{livePresent}/1</em>
           </span>
         </div>
 
@@ -165,50 +169,52 @@ export default function LaneFrame(p: Props) {
             key={`${cell.id}-${p.session.frameKey}`}
             src={frameSrc}
             title={`${cell.name} Meet odası`}
-            allow={iframeAllow}
+            allow="camera; microphone; display-capture; autoplay; fullscreen; clipboard-write"
             allowFullScreen
             referrerPolicy="no-referrer-when-downgrade"
             className="meeting-iframe"
-            onLoad={() => setFrameLoaded(true)}
             style={{ width: `${100 / scale}%`, height: `${100 / scale}%`, transform: `scale(${scale})`, transformOrigin: "0 0" }}
           />
         ) : (
           <div className="compact-placeholder"><strong>Meet bağlantısı yok</strong></div>
         )}
 
-        {frameSrc && !frameLoaded && (
-          <div className="frame-blocked-notice">
-            <Ico.Info className="h-3 w-3" />
-            <div>
-              <strong>Meet sayfası bu çerçevede gösterilemiyor</strong>
-              <span>Google güvenlik politikası gereği gömülmeyi engelliyor. Katılımcı takibi sunucu üzerinden çalışır; aşağıdan elle de ekleyebilirsiniz.</span>
-            </div>
-          </div>
-        )}
-
         <div className="frame-overlay-tools">
-          {!usingServer && (
-            <form className="guest-chip" onSubmit={submitGuest}>
-              <input value={guestName} onChange={(event) => setGuestName(event.target.value)} placeholder="Katılımcı adı yaz" maxLength={40} aria-label="Katılımcı adı" />
-              <button type="submit" title="Katılımcı ekle — 2+ kişide sayaç başlar"><Ico.Plus /></button>
-            </form>
+          {usingServer && p.serverCount > 0 && (
+            <span className="guest-pill live">Meet: {p.serverCount} kişi</span>
           )}
-
-          {usingServer
-            ? p.serverCount > 0 && (
-              <span className="guest-pill live">Sunucu: {p.serverCount} kişi</span>
-            )
-            : manualPresent.slice(0, 3).map((person) => (
-              <button
-                key={person.id}
-                className="guest-pill"
-                onClick={() => { p.onLeave(person.id); setNow(Date.now()); }}
-                title="Çıkış kaydet"
-              >
-                {person.name}
-              </button>
-            ))
-          }
+          {/* Sunucu/eklenti yokken katılımcıyı elle girmek için tek giriş kapısı. */}
+          <form
+            className="guest-chip"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const value = draft.trim();
+              if (!value) return;
+              p.onJoin(value);
+              setDraft("");
+            }}
+          >
+            <input
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              placeholder="Katılımcı adı"
+              maxLength={80}
+              aria-label={`${cell.name} katılımcı adı`}
+            />
+            <button type="submit" title="İçeri al — sayaç başlar" aria-label={`${cell.name} odasına katılımcı ekle`}>
+              <Ico.Plus />
+            </button>
+          </form>
+          {manualPeople.map((person) => (
+            <button
+              key={person.id}
+              className="guest-pill live"
+              onClick={() => p.onLeave(person.id)}
+              title="Odadan çıkar — sayaç burada durur"
+            >
+              {person.name} <Ico.X className="h-3 w-3" />
+            </button>
+          ))}
         </div>
 
         <div className="zoom-flyout">

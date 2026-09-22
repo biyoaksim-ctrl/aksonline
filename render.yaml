@@ -1,0 +1,19 @@
+# Render.com otomatik yayın tanımı.
+# Repoyu GitHub'a itip Render'da "New + Web Service" -> bu repo derseniz
+# bu dosya okunur ve ek ayar gerekmez.
+services:
+  - type: web
+    name: aks-online
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      # İsteğe bağlı: başlangıçta Google Meet erişim token'ı.
+      # Boş bırakılırsa token arayüzden (Ayarlar) girilebilir.
+      - key: GOOGLE_ACCESS_TOKEN
+        value: ""
+      - key: NODE_VERSION
+        value: "20"

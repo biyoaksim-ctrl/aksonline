@@ -26,6 +26,7 @@ function loadCells(): MeetCell[] {
           notes: typeof cell.notes === "string" ? cell.notes : "",
           pinned: cell.pinned === true,
           zoom: clampZoom(cell.zoom ?? 100),
+          guestAccum: Math.max(0, Number(cell.guestAccum) || 0),
           attendance: restoreAttendance(cell.attendance),
           example: cell.example === true,
           createdAt: typeof cell.createdAt === "number" && Number.isFinite(cell.createdAt) ? cell.createdAt : Date.now(),

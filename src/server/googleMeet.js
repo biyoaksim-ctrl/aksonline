@@ -10,8 +10,9 @@ const API = "https://meet.googleapis.com/v2/";
 const FETCH_TIMEOUT_MS = 20000;
 
 export class MeetApiError extends Error {
-  constructor(public status, message) {
+  constructor(status, message) {
     super(message || `Meet API ${status}`);
+    this.status = status;
     this.name = "MeetApiError";
   }
 }

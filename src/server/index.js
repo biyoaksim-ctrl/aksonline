@@ -25,6 +25,8 @@ import { readAttendance, MeetApiError } from "./googleMeet.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 8787);
+// Render/VPS gibi yayınlarda dış arayüz; 127.0.0.1'e kilitlenmez.
+const HOST = process.env.HOST || "0.0.0.0";
 
 /** Sunucu durumu: yalnızca bellekte tutulur, diske yazılmaz. */
 const state = {
@@ -230,9 +232,10 @@ setInterval(() => {
   if (anyWaiting) void pollOnce();
 }, POLL_WAITING_MS);
 
-server.listen(PORT, () => {
+server.listen(PORT, HOST, () => {
   console.log(`[aks-online] sunucu hazır: http://localhost:${PORT}`);
   console.log(`[aks-online] WebSocket: ws://localhost:${PORT}/ws`);
+  console.log(`[aks-online] dinlenen arayüz: ${HOST}:${PORT}`);
   if (!process.env.GOOGLE_ACCESS_TOKEN) {
     console.log("[aks-online] Google token girilmedi. Arayüzden Ayarlar bölümünden ekleyebilirsiniz.");
   }

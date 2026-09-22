@@ -67,8 +67,8 @@ const DEFAULTS: WorkspaceSettings = {
   compactFrameHeader: true,
   autoOpenNew: true,
   autoJoin: true,
-  muteAudioDefault: true,
-  muteVideoDefault: true,
+  muteAudioDefault: false,
+  muteVideoDefault: false,
   waEnabled: false,
   waPhoneId: "",
   waTo: "",
@@ -99,8 +99,8 @@ function loadSettings(): WorkspaceSettings {
       defaultZoom: clampZoom(value.defaultZoom ?? DEFAULTS.defaultZoom),
       columns,
       autoJoin: value.autoJoin !== false,
-      muteAudioDefault: value.muteAudioDefault !== false,
-      muteVideoDefault: value.muteVideoDefault !== false,
+      muteAudioDefault: value.muteAudioDefault === true,
+      muteVideoDefault: value.muteVideoDefault === true,
       lanes: Array.isArray(value.lanes) ? [...new Set(value.lanes.filter((id): id is string => typeof id === "string"))].slice(0, MAX_FRAMES) : [],
     };
   } catch {
@@ -225,7 +225,7 @@ export default function App() {
   }, [watchKey]);
 
   // Sunucu katılımcı sayısını bildirdiğinde rapora + WhatsApp'a düşür.
-  // Sayaç kuralı: sayı 2'ye ulaşınca başlar (LaneFrame içinde uygulanır).
+  // Sayaç kuralı: odaya en az 1 kişi girince başlar.
   const lastCounts = useRef<Record<string, number>>({});
   useEffect(() => {
     staged.forEach((cell) => {
@@ -240,14 +240,14 @@ export default function App() {
       if (snapshot.count > previousCount) {
         for (let i = previousCount; i < snapshot.count; i += 1) {
           const person = `Katılımcı ${i + 1}`;
-          const reachedTwo = snapshot.count >= 2 && previousCount < 2;
+          const reachedOne = snapshot.count >= 1 && previousCount < 1;
           pushReport({
             kind: "join",
             roomId: cell.id,
             roomName: cell.name,
             person,
-            detail: reachedTwo
-              ? "Oda sayısı 2'ye ulaştı — sayaç OTOMATİK başladı"
+            detail: reachedOne
+              ? "Odaya 1 kişi girdi — sayaç OTOMATİK başladı"
               : "Sunucu katılımcı sayısı arttı",
           });
           // Sunucudan gelen her yeni kişi için de WhatsApp gönder.
@@ -269,8 +269,8 @@ export default function App() {
             });
           }
         }
-        if (snapshot.count >= 2 && previousCount < 2) {
-          setNotice(`${cell.name}: 2 kişi oldu — sayaç başladı`);
+        if (snapshot.count >= 1 && previousCount < 1) {
+          setNotice(`${cell.name}: 1 kişi girdi — sayaç başladı`);
         }
       } else if (snapshot.count < previousCount) {
         pushReport({
@@ -279,12 +279,12 @@ export default function App() {
           roomName: cell.name,
           detail: `Sunucu katılımcı sayısı azaldı (${previousCount} → ${snapshot.count})`,
         });
-        if (snapshot.count < 2 && previousCount >= 2) {
+        if (snapshot.count < 1 && previousCount >= 1) {
           pushReport({
             kind: "leave",
             roomId: cell.id,
             roomName: cell.name,
-            detail: "Sayı 2'nin altına düştü — sayaç durdu",
+            detail: "Oda boşaldı — sayaç durdu",
           });
         }
       }
@@ -292,38 +292,6 @@ export default function App() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attendance, staged]);
-
-  // Manuel sayaç eşiği: sunucu canlı değilken 2'ye ulaşınca sayaç başlar.
-  const lastManualCounts = useRef<Record<string, number>>({});
-  useEffect(() => {
-    staged.forEach((cell) => {
-      const snap = attendance[cell.id];
-      const serverLiveNow = server.connected && server.hasToken && snap?.status === "live";
-      if (serverLiveNow) return; // sunucu otorite, yukarıdaki effect bakar
-      const manualCount = cell.attendance.filter((person) =>
-        person.sessions.some((s) => s.leftAt === null)
-      ).length;
-      const prev = lastManualCounts.current[cell.id] ?? 0;
-      if (manualCount >= 2 && prev < 2) {
-        pushReport({
-          kind: "join",
-          roomId: cell.id,
-          roomName: cell.name,
-          detail: `Oda sayısı 2'ye ulaştı (${manualCount} kişi) — sayaç OTOMATİK başladı`,
-        });
-        setNotice(`${cell.name}: 2 kişi oldu — sayaç başladı`);
-      } else if (manualCount < 2 && prev >= 2) {
-        pushReport({
-          kind: "leave",
-          roomId: cell.id,
-          roomName: cell.name,
-          detail: "Sayı 2'nin altına düştü — sayaç durdu",
-        });
-      }
-      lastManualCounts.current[cell.id] = manualCount;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hub.cells, staged, server.connected, server.hasToken, attendance]);
 
   const pushReport = (entry: Omit<ReportEntry, "id" | "t">) => {
     setReports((previous) => {
@@ -514,7 +482,7 @@ export default function App() {
               </div>
               <div className="batch-actions">
                 <span className={`hint-text ${server.connected && server.hasToken ? "ok" : ""}`}>
-                  {server.connected && server.hasToken ? "Canlı takip açık · katılımcı sayısı artınca sayaç otomatik başlar" : server.connected ? "Token girilmedi: katılımcılar elle eklenir" : "Sunucu bağlantısı yok: katılımcılar elle eklenir"}
+                  {server.connected && (server.hasToken || attendance && Object.values(attendance).some((snapshot) => snapshot.status === "live")) ? "Canlı Meet takibi açık · yeni katılımcı gelince sayaç otomatik başlar" : "Meet eklentisi ve Node.js sunucusu bekleniyor"}
                 </span>
               </div>
               <p className="hint-text"><b>Karşıdan katılımı görmek için:</b> Chrome’da <code>chrome://extensions</code> → Geliştirici modu → Paketlenmemiş yükle → bu projedeki <code>extension</code> klasörü. Meet’i normal sekmede aç. Eklenti kişi sayısını sunucuya yollar. Sayı 2 olunca (sen + karşıdan biri) sayaç başlar.</p>
@@ -627,7 +595,7 @@ export default function App() {
         <div className="sidebar-status">
           <span className={`status-dot ${server.connected ? "on" : ""}`} />
           <span className="server-label">
-            {server.connected ? (server.hasToken ? "Sunucu bağlı · canlı takip açık" : "Sunucu bağlı · token bekleniyor") : "Sunucu yok · manuel takip"}
+            {server.connected ? (server.hasToken ? "Sunucu bağlı · canlı takip açık" : "Sunucu bağlı · Meet eklentisi bekleniyor") : "Sunucu yok · Meet eklentisi gerekli"}
           </span>
         </div>
         <div className="sidebar-status secondary">{hub.storageError ? "Kaydetme hatası" : "Telefon · tablet · PC uyumlu"}</div>

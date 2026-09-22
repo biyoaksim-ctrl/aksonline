@@ -30,7 +30,7 @@ export interface MeetCell {
   createdAt: number;
   zoom: number;
   attendance: AttendanceParticipant[];
-  /** Sayaç 2+ kişide durdurulduğunda biriken toplam ms (sayfa yenilense de korunur). */
+  /** Sayaç durduğunda biriken toplam ms (sayfa yenilense de korunur). */
   guestAccum?: number;
   example?: boolean;
 }
