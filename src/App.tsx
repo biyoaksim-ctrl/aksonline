@@ -229,8 +229,8 @@ export default function App() {
     staged.forEach((cell) => {
       const snapshot = attendance[cell.id];
       if (!snapshot) return;
-      // "live" değilse (waiting/error) sayaç takılmaz, son sayı sıfırlanır.
-      if (snapshot.status !== "live") {
+      // "waiting" ve sayı 0'sa: katılım yok, sayaç takılmaz ve son sayı sıfırlanır.
+      if (snapshot.status !== "live" && snapshot.count <= 0) {
         lastCounts.current[cell.id] = 0;
         return;
       }
@@ -596,7 +596,7 @@ export default function App() {
                 muteAudioDefault={settings.muteAudioDefault}
                 muteVideoDefault={settings.muteVideoDefault}
                 // Meet sekmesi veya Google API canlı sayı gönderdiyse o sayı geçerlidir.
-                serverLive={server.connected && attendance[cell.id]?.status === "live"}
+                serverLive={server.connected && (attendance[cell.id]?.status === "live" || (attendance[cell.id]?.count ?? 0) > 0)}
                 serverCount={attendance[cell.id]?.count ?? 0}
                 serverStatus={(attendance[cell.id]?.status as "waiting" | "live" | "error" | "idle") ?? "idle"}
                 serverHasToken={server.hasToken}

@@ -3,7 +3,7 @@ import type { CSSProperties } from "react";
 import type { MeetCell } from "../types";
 import type { CellSession } from "../lib/useMeetHub";
 import { buildLaunchUrl, clampZoom, fmtDuration, MAX_ZOOM, meetCode, MIN_ZOOM } from "../lib/meet";
-import { advanceCounter, counterMs, resolveLivePresent } from "../lib/counter";
+import { advanceCounter, counterMs, isMeetingRunning, MEETING_THRESHOLD, resolveLivePresent } from "../lib/counter";
 import { Ico } from "./icons";
 
 interface Props {
@@ -43,11 +43,10 @@ export default function LaneFrame(p: Props) {
   const scale = cell.zoom / 100;
   const frameSrc = buildLaunchUrl(cell, muteAudioDefault, muteVideoDefault);
 
-  // Eşik: karşıdan en az 1 kişi katıldığında sayaç çalışır.
-  const MEETING_THRESHOLD = 1;
+  // Eşik: karşıdan en az 2 kişi katıldığında sayaç başlar (MEETING_THRESHOLD).
   const usingServer = p.serverLive;
   const livePresent = resolveLivePresent(p.serverLive, p.serverCount);
-  const meetingOn = livePresent >= MEETING_THRESHOLD;
+  const meetingOn = isMeetingRunning(p.serverLive, p.serverCount);
 
   // --- BİRİKİMLİ SAYAÇ ---
   // Odaya biri girer → başlar.
@@ -128,10 +127,6 @@ export default function LaneFrame(p: Props) {
           <span className={`timer room ${cell.openedAt ? "on" : ""}`} title="Oda süresi">
             <Ico.Clock className="h-3 w-3" /><time>{fmtDuration(roomMs)}</time>
           </span>
-          <span className={`timer guest ${meetingOn ? "on" : hasTime ? "paused" : ""}`}
-            title={meetingOn ? `ÇALIŞIYOR — ${livePresent} kişi içeride` : hasTime ? `DURDU — süre saklı, oda boşalınca durur` : `Odaya biri katılınca başlar — şu an ${livePresent}`}>
-            <Ico.Users className="h-3 w-3" /><time>{hasTime || meetingOn ? fmtDuration(guestMs) : "00:00:00"}</time><em>{livePresent}/1</em>
-          </span>
         </div>
 
         <span className={`live-detect ${serverBadge.cls}`} title={serverBadge.title}>
@@ -163,6 +158,20 @@ export default function LaneFrame(p: Props) {
         ) : (
           <div className="compact-placeholder"><strong>Meet bağlantısı yok</strong></div>
         )}
+
+        {/* Meet ekranının SAĞ ÜSTÜNDE: katılımcı sayısı ve sayaç durumu. */}
+        <div
+          className={`frame-counter ${meetingOn ? "on" : hasTime ? "paused" : ""}`}
+          title={meetingOn
+            ? `ÇALIŞIYOR — içeride ${livePresent} kişi · sayaç 2. katılımcıda başladı`
+            : hasTime
+            ? `DURDU — süre saklı, katılımcılar çıkınca durur`
+            : `Sayaç ${MEETING_THRESHOLD}. katılımcıda başlar — şu an içeride ${livePresent} kişi`}
+        >
+          <span className="people"><Ico.Users /><strong>{livePresent}</strong></span>
+          <span className="time"><Ico.Clock /><time>{hasTime || meetingOn ? fmtDuration(guestMs) : "00:00:00"}</time></span>
+          <em>{meetingOn ? "ÇALIŞIYOR" : hasTime ? "DURDU" : `BEKLİYOR ${livePresent}/${MEETING_THRESHOLD}`}</em>
+        </div>
 
         {/* Odadaki canlı kişi sayısı (sunucudan gelir, elle giriş yok). */}
         <div className="frame-overlay-tools">

@@ -318,6 +318,17 @@ svg { flex: none; }
 .frame-blocked-notice svg { width: 14px; height: 14px; color: var(--danger); margin-top: 1px; }
 .frame-blocked-notice strong { display: block; font-size: 10px; font-weight: 600; margin-bottom: 2px; }
 .frame-blocked-notice span { font-size: 9px; line-height: 1.5; opacity: .8; }
+/* Çerçevenin SAĞ ÜSTÜNDEKİ canlı sayaç göstergesi. */
+.frame-counter { position: absolute; top: 6px; right: 7px; z-index: 6; display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 9px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: color-mix(in srgb, var(--bg-2) 92%, transparent); backdrop-filter: blur(8px); box-shadow: 0 4px 14px var(--shadow); font-size: 10px; white-space: nowrap; pointer-events: none; }
+.frame-counter .people, .frame-counter .time { display: flex; align-items: center; gap: 4px; }
+.frame-counter svg { width: 12px; height: 12px; }
+.frame-counter time { font: 600 11px ui-monospace, "Cascadia Mono", monospace; letter-spacing: .04em; color: inherit; }
+.frame-counter strong { font-size: 11px; font-weight: 700; color: var(--text); }
+.frame-counter em { font-style: normal; font-size: 8px; font-weight: 700; letter-spacing: .07em; opacity: .85; }
+.frame-counter.on { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 50%, transparent); background: color-mix(in srgb, var(--ok) 14%, var(--bg-2)); }
+.frame-counter.on strong { color: var(--ok); }
+.frame-counter.paused { color: #fbbf24; border-color: color-mix(in srgb, #fbbf24 50%, transparent); background: color-mix(in srgb, #fbbf24 14%, var(--bg-2)); }
+.frame-counter.paused strong { color: #fbbf24; }
 .guest-pill { height: 28px; padding: 0 8px; border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); border-radius: 999px; color: var(--accent); background: color-mix(in srgb, var(--bg-2) 88%, transparent); font-size: 9px; white-space: nowrap; backdrop-filter: blur(8px); }
 .guest-pill:hover { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, transparent); }
 .zoom-flyout { position: absolute; right: 7px; bottom: 7px; z-index: 5; display: flex; align-items: flex-end; gap: 5px; }

@@ -7,7 +7,8 @@ const HOSTED_ORIGIN = "https://aks-online.onrender.com";
 const LOCAL_ORIGINS = ["http://127.0.0.1:8787", "http://localhost:8787"];
 const ENDPOINT_PATH = "/api/presence";
 
-let apiOrigin = null; // Çalışan sunucu adresi (bulunduğunda saklanır).
+let apiOrigins = []; // Çalışan sunucu adresleri (bulunduğunda saklanır).
+let apiOriginsAt = 0;
 
 function candidateOrigins(stored) {
   return [...new Set([stored, ...LOCAL_ORIGINS, HOSTED_ORIGIN].filter(Boolean))];
@@ -22,24 +23,27 @@ async function storedOrigin() {
   }
 }
 
-/** Çalışan sunucuyu bulur; bulunan adres hatırlanır ki sonraki gönderimler hızlı olsun. */
-async function resolveOrigin() {
-  if (apiOrigin) return apiOrigin;
+/** Çalışan sunucuları bulur; bulunana kadar denenmez, sonra 30 sn boyunca hatırlanır. */
+async function workingOrigins() {
+  const fresh = apiOrigins.length && Date.now() - apiOriginsAt < 30000;
+  if (fresh) return apiOrigins;
   const candidates = candidateOrigins(await storedOrigin());
+  const found = [];
   for (const origin of candidates) {
     try {
       const res = await fetch(`${origin}/api/health`, { method: "GET" });
       const data = await res.json().catch(() => ({}));
       if (res.ok && data?.ok) {
-        apiOrigin = origin;
+        found.push(origin);
         try { await chrome.storage?.local.set({ apiOrigin: origin }); } catch { /* depo yoksa yoksay */ }
-        return origin;
       }
     } catch {
       // Bu adres çalışmıyor, sıradakini dene.
     }
   }
-  return null;
+  apiOrigins = found;
+  apiOriginsAt = Date.now();
+  return found;
 }
 
 function meetingCode() {
@@ -126,26 +130,25 @@ async function report() {
     setBadge("bu sayfada değil", false);
     return;
   }
-  const origin = await resolveOrigin();
-  if (!origin) {
-    setBadge("sunucu yok", false);
+  const count = participantCount();
+  const origins = await workingOrigins();
+  if (!origins.length) {
+    setBadge(`${code} · ${count} kişi · SUNUCU YOK`, false);
     return;
   }
-  const count = participantCount();
-  try {
-    const res = await fetch(`${origin}${ENDPOINT_PATH}`, {
+  // Çalışan TÜM sunuculara yazar: hangi panel (yerel ya da yayın) açıksa sayıyı oradan okur.
+  const results = await Promise.allSettled(origins.map((origin) =>
+    fetch(`${origin}${ENDPOINT_PATH}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ code, count, source: "meet-tab" }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (res.ok && data.ok) {
-      setBadge(`${code} · ${count} kişi → panel`, (data.updated ?? 0) > 0 || count === 0);
-    } else {
-      setBadge(`${code} · ${count} kişi → panel yok`, false);
-    }
-  } catch {
-    setBadge(`${code} · ${count} kişi → sunucu yok`, false);
+    })
+  ));
+  const delivered = results.filter((result) => result.status === "fulfilled" && result.value.ok).length;
+  if (delivered > 0) {
+    setBadge(`${code} · ${count} kişi → panel (${delivered}/${origins.length})`, true);
+  } else {
+    setBadge(`${code} · ${count} kişi → panel YOK`, false);
   }
 }
 

@@ -16,6 +16,9 @@ export interface CounterState {
 
 export const emptyCounter: CounterState = { accum: 0, startAt: null };
 
+/** Odaya en az bu kadar kişi katıldığında sayaç başlar. */
+export const MEETING_THRESHOLD = 2;
+
 /** Toplantı sürümünü (giriş/çıkış) yeni duruma uygular. Değişiklik yoksa aynı nesneyi döndürür. */
 export function advanceCounter(state: CounterState, running: boolean, now: number): CounterState {
   if (running) {
@@ -32,6 +35,11 @@ export function resolveLivePresent(serverLive: boolean, serverCount: number): nu
   if (!serverLive) return 0;
   if (!Number.isFinite(serverCount) || serverCount < 0) return 0;
   return Math.floor(serverCount);
+}
+
+/** Sayaç şu an çalışıyor mu: içerideki kişi sayısı eşiğe (varsayılan 2) ulaştı mı. */
+export function isMeetingRunning(serverLive: boolean, serverCount: number, threshold: number = MEETING_THRESHOLD): boolean {
+  return resolveLivePresent(serverLive, serverCount) >= threshold;
 }
 
 /** O anki toplam gösterilen süre (biriken + henüz durdurulmamış segment). */

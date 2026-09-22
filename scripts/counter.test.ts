@@ -1,5 +1,5 @@
 import { strict as assert } from "node:assert";
-import { advanceCounter, counterMs, emptyCounter, resolveLivePresent } from "../src/lib/counter.ts";
+import { advanceCounter, counterMs, emptyCounter, isMeetingRunning, resolveLivePresent } from "../src/lib/counter.ts";
 
 const T0 = 1_700_000_000_000;
 let checks = 0;
@@ -46,6 +46,17 @@ console.log("\n2) Sayı kaynağı: yalnızca sunucudan gelen canlı sayı");
   assert.equal(resolveLivePresent(true, -4), 0, "bozuk sayı 0'a düşer");
   assert.equal(resolveLivePresent(true, 2.7), 2, "kesirli sayı alta yuvarlanır");
   ok("sayaç yalnızca karşıdan katılan gerçek kişi sayısına göre çalışır");
+}
+
+console.log("\n3) Eşik: sayaç 2. katılımcıda başlar");
+{
+  assert.equal(isMeetingRunning(true, 0), false, "kimse yokken başlamaz");
+  assert.equal(isMeetingRunning(true, 1), false, "tek kişi yeterli değildir — 2 olacak");
+  assert.equal(isMeetingRunning(true, 2), true, "ikinci kişi katılınca başlar");
+  assert.equal(isMeetingRunning(true, 5), true, "3+ kişide çalışmaya devam");
+  assert.equal(isMeetingRunning(false, 5), false, "sunucu yokken sayı yoktur");
+  assert.equal(resolveLivePresent(true, 1), 1, "1 kişi sayılır ama eşik dolmaz");
+  ok("2. katılımcıda sayaç BAŞLAR");
 }
 
 console.log(`\nSonuç: ${checks} kontrol geçti.`);

@@ -38,6 +38,20 @@ const state = {
 };
 
 const app = express();
+
+/**
+ * Meet sekmesi (HTTPS) bu sunucuya (HTTP localhost ya da HTTPS yayın) istek atar.
+ * Chrome, HTTPS sayfadan yerel/adres isteklerinde "Private Network Access" ön onayı
+ * ister; başlık yoksa istek REDDEDİLİR ve sayı hiç ulaşmaz. Bu yüzden başlık zorunlu.
+ */
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", req.headers.origin || "*");
+  res.setHeader("Access-Control-Allow-Private-Network", "true");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  if (req.method === "OPTIONS") return res.status(204).end();
+  next();
+});
 app.use(cors());
 app.use(express.json({ limit: "32kb" }));
 
