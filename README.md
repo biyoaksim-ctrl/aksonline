@@ -58,13 +58,13 @@ son kişi çıkınca durur). Sol panelin altında "Sunucu yok · manuel takip" y
 
 Canlı Meet sayısının gelmesi için Node sunucusunun da yayınlanması gerekir.
 
-1. Bu repoyu GitHub'a itin
-2. [render.com](https://render.com) → **Sign in with GitHub** → **New +** → **Blueprint** → repoyu seç → **Apply**
+1. Bu repoyu GitHub'a itin (bitti: https://github.com/biyoaksim-ctrl/aksonline)
+2. [render.com](https://render.com) → **Sign in with GitHub** → **New +** → **Blueprint** → `aksonline` → **Apply**
    (`render.yaml` build/start/health ayarlarını otomatik getirir)
-3. Bittiğinde `https://aks-online.onrender.com` benzeri adresi alırsınız
+3. Yayındaki adres: **https://aks-online.onrender.com** ✓ (canlı, `/api/health` yanıt verir)
 4. Paneli bu adreste açın; sol alttaki durum noktası yeşile döner
-5. `extension/content.js` içindeki `HOSTED_ORIGIN` sabitini bu adresle değiştirip
-   eklentiyi `chrome://extensions` → **Paketlenmemiş yüklemeyi ekle** ile yeniden yükleyin
+5. Chrome eklentisi bu adresi `extension/content.js` içindeki `HOSTED_ORIGIN` sabitinden okur;
+   eklenti zaten yüklüyse `chrome://extensions` → **Yeniden yükle** demek yeterlidir
 
 Notlar:
 
@@ -80,12 +80,14 @@ Yayında canlı sayı için Chrome eklentisinin Render adresine de ulaşması ge
 `extension/content.js` içindeki satırı kendi adresinizle değiştirin:
 
 ```js
-const HOSTED_ORIGIN = "https://<ad>.onrender.com";
+const HOSTED_ORIGIN = "https://aks-online.onrender.com"; // bu depoda zaten böyle
 ```
 
 Sonra `chrome://extensions` → **Yükleme geliştirici modu** → **Paketlenmemiş yüklemeyi
-ekle** ile `extension/` klasörünü yeniden yükleyin. Eklenti önce yerel sunucuyu, sonra
-yayın adresini dener; çalışan adresi hatırlar ve rozette `→ panel` yazar.
+ekle** ile `extension/` klasörünü yükleyin (zaten yüklüyse **Yeniden yükle** yeterlidir).
+Eklenti önce yerel sunucuyu, sonra yayın adresini dener; çalışan adresi hatırlar ve
+rozette `→ panel` yazar. Bu depoda `HOSTED_ORIGIN` zaten `https://aks-online.onrender.com`
+olarak tanımlıdır.
 
 ## Ortam değişkenleri
 
