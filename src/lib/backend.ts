@@ -35,13 +35,31 @@ class BackendClient {
   connected = false;
   hasToken = false;
 
-  /** Production'da aynı origin; Vite dev'de Node sunucusu :8787. */
-  private resolveUrl(): string {
+  /**
+   * Hangi sunucuya bağlanılacak?
+   * - Vite dev (5173/4173) → yanındaki Node sunucusu (:8787)
+   * - Üretim → VITE_WS_ORIGIN (yayın adresi), yoksa sayfanın kendi origin'i
+   * Böylece telefon/tablet/hangi adresi açarsa aynı sayı merkezine bağlanır;
+   * WebSocket desteklemeyen bir yayın (ör. GitHub Pages) de sayıyı alabilir.
+   */
+  private apiBase(): string {
     if (typeof window === "undefined") return "";
     const devServer = window.location.port === "5173" || window.location.port === "4173";
-    const host = devServer ? `${window.location.hostname}:8787` : window.location.host;
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    return `${protocol}//${host}/ws`;
+    if (devServer) return `http://${window.location.hostname}:8787`;
+    return import.meta.env.VITE_WS_ORIGIN?.trim() || window.location.origin;
+  }
+
+  private resolveUrl(): string {
+    if (typeof window === "undefined") return "";
+    const base = this.apiBase();
+    try {
+      const url = new URL(base);
+      url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+      return `${url.origin}/ws`;
+    } catch {
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      return `${protocol}//${window.location.host}/ws`;
+    }
   }
 
   connect(): void {
@@ -164,10 +182,7 @@ class BackendClient {
   /** Erişim token'ını gövdeyle iletir; URL'ye ve hafızaya yazılmaz. */
   async saveToken(token: string): Promise<boolean> {
     try {
-      const apiHost = typeof window !== "undefined" && (window.location.port === "5173" || window.location.port === "4173")
-        ? `${window.location.protocol}//${window.location.hostname}:8787`
-        : "";
-      const response = await fetch(`${apiHost}/api/config`, {
+      const response = await fetch(`${this.apiBase()}/api/config`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token }),

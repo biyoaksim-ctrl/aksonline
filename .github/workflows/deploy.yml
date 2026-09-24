@@ -27,6 +27,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+        env:
+          # Sayı tek merkezden okunsun: Pages yayını da Render sunucusuna bağlanır.
+          VITE_WS_ORIGIN: https://aks-online.onrender.com
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

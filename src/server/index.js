@@ -153,7 +153,9 @@ function broadcastAttendance(roomId) {
 
 function touchRoom(roomId, code) {
   if (!state.rooms.has(roomId)) {
-    state.rooms.set(roomId, { code, count: 0, lastSyncAt: null, status: "waiting", error: null });
+    // "idle": oda yeni açıldı, henüz ne eklenti ne Google API sayı göndermedi.
+    // Panelde "SAYI GELMİYOR" teşhisi bu değerle gösterilir.
+    state.rooms.set(roomId, { code, count: 0, lastSyncAt: null, status: "idle", error: null });
     state.watchers.set(roomId, new Set());
   } else {
     state.rooms.get(roomId).code = code;

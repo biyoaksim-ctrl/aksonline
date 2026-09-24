@@ -108,11 +108,30 @@ export default function LaneFrame(p: Props) {
   const guestMs = counterMs({ accum: guestAccum, startAt: segmentStartRef.current }, now);
   const hasTime = guestMs > 0;
 
+  /**
+   * Sağ üst göstergenin durumu — nerede takıldığımız belli olsun:
+   *   BAĞLANTI YOK → sunucuya ulaşılamıyor (yanlış adres / ağ)
+   *   SAYI GELMİYOR → sunucu bağlı ama Meet'ten henüz sayı yok (eklenti ya da API)
+   *   BEKLİYOR n/2 → sayı geldi, eşik dolmadı
+   *   ÇALIŞIYOR / DURDU
+   */
+  const counterState = !p.serverConnected
+    ? { cls: "off", label: "BAĞLANTI YOK", title: "Sunucuya ulaşılamıyor. Panelin https://aks-online.onrender.com adresinde açık olduğundan emin ol." }
+    : p.serverStatus === "idle"
+    ? { cls: "off", label: "SAYI GELMİYOR", title: "Sunucu bağlı ama odanın katılımcı sayısı henüz gelmedi. Bilgisayarda Meet sekmesini aç, chrome://extensions → Aks eklentisini yükle; sonra bu sayfayı yenile." }
+    : p.serverStatus === "error"
+    ? { cls: "off", label: "HATA", title: "Sunucu katılım verisini okurken hata aldı. Google Meet API bağlıysa token geçersiz olabilir." }
+    : meetingOn
+    ? { cls: "on", label: "ÇALIŞIYOR", title: `İçeride ${livePresent} kişi · sayaç ${MEETING_THRESHOLD}. katılımcıda başladı` }
+    : hasTime
+    ? { cls: "paused", label: "DURDU", title: "Oda boşaldı, süre saklandı. Katılımcı girince kaldığı yerden devam eder." }
+    : { cls: "wait", label: `BEKLİYOR ${livePresent}/${MEETING_THRESHOLD}`, title: `Sayaç ${MEETING_THRESHOLD}. katılımcıda başlar · şu an içeride ${livePresent} kişi` };
+
   const serverBadge = usingServer
     ? { cls: "on", label: `${livePresent}`, title: `Canlı takip · ${livePresent} kişi içeride · sayaç ${meetingOn ? "ÇALIŞIYOR" : "bekliyor"}` }
     : p.serverConnected
-    ? { cls: "wait", label: "…", title: "Sunucu bağlı — Meet sekmesinden katılım bekleniyor (Aks rozetini kontrol edin)" }
-    : { cls: "off", label: "off", title: "Sunucu bağlı değil — sunucuyu başlatın ve Meet eklentisini kurun" };
+    ? { cls: "wait", label: "…", title: counterState.title }
+    : { cls: "off", label: "off", title: counterState.title };
 
   return (
     <section ref={frameRef} className={`meet-frame ${p.compactHeader ? "compact" : ""}`} style={{ "--lane-color": cell.color } as CSSProperties}>
@@ -160,17 +179,10 @@ export default function LaneFrame(p: Props) {
         )}
 
         {/* Meet ekranının SAĞ ÜSTÜNDE: katılımcı sayısı ve sayaç durumu. */}
-        <div
-          className={`frame-counter ${meetingOn ? "on" : hasTime ? "paused" : ""}`}
-          title={meetingOn
-            ? `ÇALIŞIYOR — içeride ${livePresent} kişi · sayaç 2. katılımcıda başladı`
-            : hasTime
-            ? `DURDU — süre saklı, katılımcılar çıkınca durur`
-            : `Sayaç ${MEETING_THRESHOLD}. katılımcıda başlar — şu an içeride ${livePresent} kişi`}
-        >
+        <div className={`frame-counter ${counterState.cls}`} title={counterState.title}>
           <span className="people"><Ico.Users /><strong>{livePresent}</strong></span>
           <span className="time"><Ico.Clock /><time>{hasTime || meetingOn ? fmtDuration(guestMs) : "00:00:00"}</time></span>
-          <em>{meetingOn ? "ÇALIŞIYOR" : hasTime ? "DURDU" : `BEKLİYOR ${livePresent}/${MEETING_THRESHOLD}`}</em>
+          <em>{counterState.label}</em>
         </div>
 
         {/* Odadaki canlı kişi sayısı (sunucudan gelir, elle giriş yok). */}

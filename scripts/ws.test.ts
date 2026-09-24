@@ -13,6 +13,8 @@ import { WebSocket } from "ws";
 const BASE = process.env.TEST_ORIGIN ?? "http://127.0.0.1:8787";
 const WS_URL = BASE.replace(/^http/, "ws") + "/ws";
 const CODE = "abc-defg-hij";
+/** Her çalıştırmada yeni oda: sunucu odayı "idle" (SAYI GELMİYOR) ile açmalı. */
+const ROOM_ID = `ws-test-${Date.now()}`;
 const TIMEOUT_MS = 15000;
 
 async function serverUp(): Promise<boolean> {
@@ -36,13 +38,13 @@ async function main() {
 
   await new Promise<void>((resolve, reject) => {
     socket.on("open", () => {
-      socket.send(JSON.stringify({ type: "watch", roomId: "ws-test", code: CODE }));
+      socket.send(JSON.stringify({ type: "watch", roomId: ROOM_ID, code: CODE }));
       setTimeout(() => {
         void fetch(`${BASE}/api/presence`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Origin: "https://meet.google.com" },
           body: JSON.stringify({ code: CODE, count: 2, source: "meet-tab" }),
-        }).catch(() => { /* yanıt beklenen senaryoda重要 değil */ });
+        }).catch(() => { /* yanıt beklenen senaryoda kritik değil */ });
       }, 500);
       setTimeout(resolve, 4000);
     });
@@ -68,9 +70,14 @@ async function main() {
     return item.type === "attendance" && item.count === 2 && item.status === "live";
   }) as { roomId?: string } | undefined;
   assert.ok(live, "count=2 / status=live mesajı WS ile yayınlanmış olmalı");
-  assert.equal(live.roomId, "ws-test", "mesaj doğru izleyiciye ulaşmalı");
+  assert.equal(live.roomId, ROOM_ID, "mesaj doğru izleyiciye ulaşmalı");
+
+  // 4) Teşhis durumları: yeni oda "idle" (SAYI GELMİYOR) ile açılmalı.
+  const firstStatus = (first as unknown as { status?: string }).status;
+  assert.equal(firstStatus, "idle", "yeni açılan oda 'idle' olmalı — panel 'SAYI GELMİYOR' der");
 
   console.log(`\n[ws] ${messages.length} paket alındı, hepsi nesne ✓ · canlı sayı yayınlandı ✓`);
+  console.log("[ws] Teşhis: yeni oda 'idle' ✓ · sayı geldikçe 'live' ✓");
   console.log("[ws] Sonuç: çift JSON sarmalama yok, arayüz mesajı okuyabilir.");
 }
 
